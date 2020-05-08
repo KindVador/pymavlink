@@ -177,11 +177,11 @@ def generate_message_h(directory, m):
 
 #define MAVLINK_MSG_ID_${name} ${id}
 
-MAVPACKED(
+${MAVPACKED_START}
 typedef struct __mavlink_${name_lower}_t {
 ${{ordered_fields: ${type} ${name}${array_suffix}; /*< ${units} ${description}*/
 }}
-}) mavlink_${name_lower}_t;
+}${MAVPACKED_END} mavlink_${name_lower}_t;
 
 #define MAVLINK_MSG_ID_${name}_LEN ${wire_length}
 #define MAVLINK_MSG_ID_${name}_MIN_LEN ${wire_min_length}
@@ -586,9 +586,10 @@ def generate_one(basename, xml):
     if xml.command_24bit:
         # we sort with primary key msgid
         for msgid in sorted(xml.message_crcs.keys()):
-            xml.message_crcs_array += '{%u, %u, %u, %u, %u, %u}, ' % (msgid,
+            xml.message_crcs_array += '{%u, %u, %u, %u, %u, %u, %u}, ' % (msgid,
                                                                       xml.message_crcs[msgid],
                                                                       xml.message_min_lengths[msgid],
+                                                                      xml.message_lengths[msgid],
                                                                       xml.message_flags[msgid],
                                                                       xml.message_target_system_ofs[msgid],
                                                                       xml.message_target_component_ofs[msgid])
@@ -673,6 +674,12 @@ def generate_one(basename, xml):
                     f.c_test_value = "%sLL" % f.test_value                    
                 else:
                     f.c_test_value = f.test_value
+        if m.needs_pack:
+            m.MAVPACKED_START = "MAVPACKED("
+            m.MAVPACKED_END = ")"
+        else:
+            m.MAVPACKED_START = ""
+            m.MAVPACKED_END = ""
 
     # cope with uint8_t_mavlink_version
     for m in xml.message:

@@ -31,6 +31,7 @@
         <xs:pattern value="\d{1,10}"/> <!-- base 10 int -->
         <xs:pattern value="0[xX][0-9a-fA-F]{1,8}"/> <!-- base 16 -->
         <xs:pattern value="0[bB][0-1]{1,32}"/> <!-- base 1 -->
+        <xs:pattern value="NaN"/> <!-- Allow not-a-number as a default (for params) -->
     </xs:restriction>
   </xs:simpleType>
 </xs:attribute>
@@ -67,9 +68,11 @@
     <!-- time -->
     <xs:enumeration value="s"/>        <!-- seconds -->
     <xs:enumeration value="ds"/>       <!-- deciseconds -->
+    <xs:enumeration value="cs"/>       <!-- centiseconds -->
     <xs:enumeration value="ms"/>       <!-- milliseconds -->
     <xs:enumeration value="us"/>       <!-- microseconds -->
     <xs:enumeration value="Hz"/>       <!-- Herz -->
+    <xs:enumeration value="MHz"/>      <!-- Mega-Herz -->
     <!-- distance -->
     <xs:enumeration value="km"/>       <!-- kilometres -->
     <xs:enumeration value="dam"/>      <!-- decametres -->
@@ -84,6 +87,7 @@
     <xs:enumeration value="cm/s"/>     <!-- centimetres per second -->
     <xs:enumeration value="mm"/>       <!-- millimetres -->
     <xs:enumeration value="mm/s"/>     <!-- millimetres per second -->
+    <xs:enumeration value="mm/h"/>     <!-- millimetres per hour -->
     <!-- temperature -->
     <xs:enumeration value="K"/>        <!-- Kelvin -->
     <xs:enumeration value="degC"/>     <!-- degrees Celsius -->
@@ -96,9 +100,10 @@
     <xs:enumeration value="deg/2"/>    <!-- degrees/2 required from dagar for HIGH_LATENCY2 message-->
     <xs:enumeration value="deg/s"/>    <!-- degrees per second -->
     <xs:enumeration value="cdeg"/>     <!-- centidegrees -->
+    <xs:enumeration value="cdeg/s"/>     <!-- centidegrees per second -->
     <xs:enumeration value="degE5"/>    <!-- degrees * 10E5 -->
     <xs:enumeration value="degE7"/>    <!-- degrees * 10E7 -->
-    <xs:enumeration value="rpm"/>      <!-- rotations per second -->
+    <xs:enumeration value="rpm"/>      <!-- rotations per minute -->
     <!-- electricity -->
     <xs:enumeration value="V"/>        <!-- Volt -->
     <xs:enumeration value="cV"/>       <!-- centi-Volt -->
@@ -113,26 +118,35 @@
     <xs:enumeration value="mgauss"/>   <!-- milli-Gauss -->
     <!-- energy -->
     <xs:enumeration value="hJ"/>       <!-- hecto-Joule -->
+    <!-- power -->
+    <xs:enumeration value="W"/>        <!-- Watt -->
     <!-- force -->
     <xs:enumeration value="mG"/>       <!-- milli-G -->
+    <!-- mass -->
+    <xs:enumeration value="g"/>       <!-- grams -->
     <!-- pressure -->
     <xs:enumeration value="Pa"/>       <!-- Pascal -->
     <xs:enumeration value="hPa"/>      <!-- hecto-Pascal -->
+    <xs:enumeration value="kPa"/>      <!-- kilo-Pascal -->
     <xs:enumeration value="mbar"/>     <!-- millibar -->
     <!-- ratio -->
     <xs:enumeration value="%"/>        <!-- percent -->
     <xs:enumeration value="d%"/>       <!-- decipercent -->
     <xs:enumeration value="c%"/>       <!-- centipercent -->
     <xs:enumeration value="dB"/>       <!-- Deci-Bell -->
+    <xs:enumeration value="dBm"/>      <!-- Deci-Bell-milliwatts-->
     <!-- digital -->
     <xs:enumeration value="KiB"/>      <!-- Kibibyte (1024 bytes) -->
     <xs:enumeration value="KiB/s"/>    <!-- Kibibyte (1024 bytes) per second -->
     <xs:enumeration value="MiB"/>      <!-- Mebibyte (1024*1024 bytes) -->
     <xs:enumeration value="MiB/s"/>    <!-- Mebibyte (1024*1024 bytes) per second -->
     <xs:enumeration value="bytes"/>    <!-- bytes -->
+    <xs:enumeration value="bytes/s"/>  <!-- bytes per second-->
     <xs:enumeration value="bits/s"/>   <!-- bits per second -->
     <xs:enumeration value="pix"/>      <!-- pixels -->
     <xs:enumeration value="dpix"/>     <!-- decipixels -->
+    <!-- flow -->
+    <xs:enumeration value="g/min"/>    <!-- grams/minute -->
   </xs:restriction>
 </xs:simpleType>
 
@@ -143,6 +157,7 @@
 <xs:attribute name="increment" type="xs:float"/>                       <!-- parameter increment -->
 <xs:attribute name="minValue" type="xs:float"/>                        <!-- parameter minimum value -->
 <xs:attribute name="maxValue" type="xs:float"/>                        <!-- parameter maximum value -->
+<xs:attribute name="reserved" type="xs:boolean" default="false"/>      <!-- parameter is reserved -->
 
 <!-- definition entry elements attributes (like the ones used on MAV_CMD for example) -->
 <xs:attribute name="hasLocation" type="xs:boolean" default="true"/>    <!-- entry has lat/lon/alt location -->
@@ -159,6 +174,8 @@
         <xs:attribute ref="increment"/>
         <xs:attribute ref="minValue"/>
         <xs:attribute ref="maxValue"/>
+        <xs:attribute ref="reserved"/>
+        <xs:attribute ref="default"/>
     </xs:complexType>
 </xs:element>
 
@@ -215,6 +232,9 @@
     </xs:complexType>
 </xs:element>
 
+<!-- definition entry elements attributes (like the ones used on MAV_CMD for example) -->
+<xs:attribute name="bitmask" type="xs:boolean" default="false"/>
+
 <xs:element name="enum">
     <xs:complexType>
         <xs:sequence>
@@ -223,6 +243,7 @@
             <xs:element ref="entry" maxOccurs="unbounded"/>
         </xs:sequence>
         <xs:attribute ref="name" use="required"/>
+        <xs:attribute ref="bitmask"/>
     </xs:complexType>
 </xs:element>
 

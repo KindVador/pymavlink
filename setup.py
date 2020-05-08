@@ -13,7 +13,7 @@ except LookupError:
 from setuptools import setup, Extension
 import glob, os, shutil, fnmatch, platform, sys
 
-version = '2.2.21'
+version = '2.4.8'
 
 
 def generate_content():
@@ -23,6 +23,7 @@ def generate_content():
     # path to message_definitions directory
     if os.getenv("MDEF",None) is not None:
         mdef_paths = [os.getenv("MDEF")]
+
     else:
         mdef_paths = [os.path.join('..', 'message_definitions'),
                       os.path.join('mavlink', 'message_definitions'),
@@ -75,7 +76,14 @@ def generate_content():
                 sys.exit(1)
 
 extensions = []  # Assume we might be unable to build native code
-if platform.system() != 'Windows':
+# check if we need to compile mavnative
+disable_mavnative = os.getenv("DISABLE_MAVNATIVE", False)
+if type(disable_mavnative) is str and disable_mavnative in ["True", "true", "1"]:
+    disable_mavnative = True
+else:
+    disable_mavnative = False
+
+if platform.system() != 'Windows' and not disable_mavnative:
     extensions = [ Extension('mavnative',
                    sources=['mavnative/mavnative.c'],
                    include_dirs=[
@@ -85,7 +93,9 @@ if platform.system() != 'Windows':
                        ]
                    ) ]
 else:
-    print("Skipping mavnative due to Windows possibly missing a compiler...")
+    print("###################################")
+    print("Skipping mavnative")
+    print("###################################")
 
 
 class custom_build_py(build_py):
@@ -103,7 +113,7 @@ setup (name = 'pymavlink',
                            'creation of simple scripts to analyse telemetry logs from autopilots such as ArduPilot which use '
                            'the MAVLink protocol. See the scripts that come with the package for examples of small, useful '
                            'scripts that use pymavlink. For more information about the MAVLink protocol see '
-                           'http://qgroundcontrol.org/mavlink/'),
+                           'https://mavlink.io/en/'),
        url = 'https://github.com/ArduPilot/pymavlink/',
        classifiers=['Development Status :: 4 - Beta',
                     'Environment :: Console',
@@ -153,7 +163,10 @@ setup (name = 'pymavlink',
                    'tools/mavfft.py',
                    'tools/mavfft_isb.py',
                    'tools/mavsummarize.py',
-                   'tools/MPU6KSearch.py'],
+                   'tools/MPU6KSearch.py',
+                   'tools/mavlink_bitmask_decoder.py',
+                   'tools/magfit_WMM.py',
+       ],
        install_requires=[
             'future',
             'lxml',
