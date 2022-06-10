@@ -13,6 +13,7 @@ import time
 import copy
 
 from argparse import ArgumentParser
+import scipy.signal as signal
 
 parser = ArgumentParser(description=__doc__)
 parser.add_argument("--condition", default=None, help="select packets by condition")
@@ -21,12 +22,15 @@ parser.add_argument("--scale", dest='fft_scale', default='db', action='store', h
 parser.add_argument("--window", dest='fft_window', default='hanning', action='store', help="windowing function to use for processing the data: 'hanning', 'blackman' or 'None'")
 parser.add_argument("--overlap", dest='fft_overlap', default=False, action='store_true', help="whether or not to use window overlap when analysing data")
 parser.add_argument("--output", dest='fft_output', default='psd', action='store', help="whether to output frequency spectrum information as power or linear spectral density: 'psd' or 'lsd'")
+parser.add_argument("--notch-params", default=False, action='store_true', help="whether to output estimated harmonic notch parameters")
+parser.add_argument("--notch-peak", dest='fft_peak', default=0, action='store', help="peak to select when setting notch parameters")
+parser.add_argument("--axis", dest='axis', default='XYZ', action='store', help="Select which axis to plot default: XYZ")
 
 args = parser.parse_args()
 
 from pymavlink import mavutil
 
-def mavfft_fttd(logfile):
+def mavfft_fttd(logfile, multi_log):
     '''display fft for raw ACC data in logfile'''
 
     '''object to store data about a single FFT plot'''
@@ -47,7 +51,7 @@ def mavfft_fttd(logfile):
 
         def add_fftd(self, fftd):
             if fftd.N != self.fftnum:
-                print("Skipping ISBD with wrong fftnum (%u vs %u)\n" % (fftd.fftnum, self.fftnum))
+                print("Skipping ISBD with wrong fftnum (%u vs %u)\n" % (fftd.N, self.fftnum))
                 return
             if self.holes:
                 print("Skipping ISBD(%u) for ISBH(%u) with holes in it" % (fftd.seqno, self.fftnum))
@@ -100,6 +104,9 @@ def mavfft_fttd(logfile):
     hntch_option = None
     batch_mode = None
     start_time = time.time()
+    thr_total = 0.
+    thr_count = 0
+
     while True:
         m = mlog.recv_match(condition=args.condition)
         if m is None:
@@ -134,10 +141,19 @@ def mavfft_fttd(logfile):
             elif m.Name == "INS_LOG_BAT_OPT":
                 batch_mode = m.Value
 
+        # get an average read of the throttle value assuming a stable hover above 1m
+        if args.notch_params and msg_type == "CTUN":
+            if m.Alt > 1:
+                thr_total += m.ThO
+                thr_count = thr_count + 1
+
     print("", file=sys.stderr)
     time_delta = time.time() - start_time
     print("%us messages  %u messages/second  %u kB/second" % (msgcount, msgcount/time_delta, os.stat(filename).st_size/time_delta))
     print("Extracted %u fft data sets" % len(things_to_plot), file=sys.stderr)
+    if args.notch_params:
+        thr_ref = thr_total / thr_count
+        print("Throttle average %f" % thr_ref)
 
     sum_fft = {}
     freqmap = {}
@@ -146,8 +162,9 @@ def mavfft_fttd(logfile):
     window = {}
     S2 = {}
     hntch_mode_names = { 0:"No", 1:"Throttle", 2:"RPM", 3:"ESC", 4:"FFT"}
-    hntch_option_names = { 0:"Single", 1:"Double"}
+    hntch_option_names = { 0:"Single", 1:"Double", 2:"Dynamic", 4:"Loop-Rate"}
     batch_mode_names = { 0:"Pre-filter", 1:"Sensor-rate", 2:"Post-filter" }
+    fft_peak = int(args.fft_peak)
 
     first_freq = None
     for thing_to_plot in things_to_plot:
@@ -176,6 +193,9 @@ def mavfft_fttd(logfile):
             S2[thing_to_plot.tag()] = numpy.inner(window[thing_to_plot.tag()], window[thing_to_plot.tag()])
 
         for axis in [ "X","Y","Z" ]:
+            # only plot the selected axis
+            if axis not in args.axis:
+                continue
             # normalize data and convert to dps in order to produce more meaningful magnitudes
             if thing_to_plot.sensor_type == 1:
                 d = numpy.array(numpy.degrees(thing_to_plot.data[axis])) / float(thing_to_plot.multiplier)
@@ -210,15 +230,39 @@ def mavfft_fttd(logfile):
         print("Sensor: %s" % str(sensor))
         fig = pylab.figure(str(sensor))
         for axis in [ "X","Y","Z" ]:
+            # only plot the selected axis
+            if axis not in args.axis:
+                continue
+
             # normalize output to averaged PSD
             psd = 2 * (sum_fft[sensor][axis] / counts[sensor]) / (sample_rates[sensor] * S2[sensor])
+
+            # calculate peaks from linear accel data
+            # the accel data is less noisy than the gyro data
+            if sensor == 'Accel[0]' and axis == "X" and args.notch_params:
+                linear_psd = numpy.sqrt(psd)
+                peaks, _ = signal.find_peaks(psd, prominence=0.1)
+                peak_freqs = freqmap[sensor][peaks]
+                print("Peaks: %s" % str(peak_freqs))
+                print("INS_HNTCH_REF = %.4f" % thr_ref)
+                print("INS_HNTCH_FREQ = %.1f" % float(peak_freqs[fft_peak]))
+                print("INS_HNTCH_BW = %.1f" % (float(peak_freqs[fft_peak])/2.))
+
             # linerize of requested
             if args.fft_output == 'lsd':
                 psd = numpy.sqrt(psd)
             # convert to db if requested
             if args.fft_scale == 'db':
                 psd = 10 * numpy.log10 (psd)
-            pylab.plot(freqmap[sensor], psd, label=axis)
+            # add file name to axis if doing multi-file plot
+            if multi_log:
+                # remove extension and path
+                (log_name, _, _) = logfile.rpartition('.')
+                (_, _, log_name) = log_name.rpartition('/')
+                legend_label = '%s (%s)' % (axis, log_name)
+            else:
+                legend_label = axis
+            pylab.plot(freqmap[sensor], psd, label=legend_label)
         pylab.legend(loc='upper right')
         pylab.xlabel('Hz')
         scale_label=''
@@ -237,9 +281,15 @@ def mavfft_fttd(logfile):
                 pylab.ylabel('PSD $' + scale_label + 'm^2/s^4/Hz$')
 
         if hntch_mode is not None and hntch_option is not None and batch_mode is not None:
+            option_label = ""
+            for hopt in hntch_option_names:
+                if hopt & int(hntch_option) != 0:
+                    if len(option_label) > 0:
+                        option_label += "+"
+                    option_label += hntch_option_names[hopt]
             textstr = '\n'.join((
                 r'%s tracking' % (hntch_mode_names[hntch_mode], ),
-                r'%s notch' % (hntch_option_names[hntch_option], ),
+                r'%s notch' % (option_label, ),
                 r'%s sampling' % (batch_mode_names[batch_mode], )))
 
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
@@ -247,7 +297,12 @@ def mavfft_fttd(logfile):
             pylab.text(0.5, 0.95, textstr, fontsize=12,
                 verticalalignment='top', bbox=props, transform=pylab.gca().transAxes)
 
+# auto set option for adding log names to legend label
+multi_log = False
+if len(args.logs) > 1:
+    multi_log = True
+
 for filename in args.logs:
-    mavfft_fttd(filename)
+    mavfft_fttd(filename, multi_log)
 
 pylab.show()

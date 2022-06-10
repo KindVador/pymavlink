@@ -13,8 +13,8 @@ except LookupError:
 from setuptools import setup, Extension
 import glob, os, shutil, fnmatch, platform, sys
 
-version = '2.4.8'
-
+sys.path.insert(0, os.path.dirname(__file__))
+from __init__ import __version__
 
 def generate_content():
     # generate the file content...
@@ -107,7 +107,7 @@ class custom_build_py(build_py):
 
 
 setup (name = 'pymavlink',
-       version = version,
+       version = __version__,
        description = 'Python MAVLink code',
        long_description = ('A Python library for handling MAVLink protocol streams and log files. This allows for the '
                            'creation of simple scripts to analyse telemetry logs from autopilots such as ArduPilot which use '
@@ -115,14 +115,17 @@ setup (name = 'pymavlink',
                            'scripts that use pymavlink. For more information about the MAVLink protocol see '
                            'https://mavlink.io/en/'),
        url = 'https://github.com/ArduPilot/pymavlink/',
-       classifiers=['Development Status :: 4 - Beta',
+       classifiers=['Development Status :: 5 - Production/Stable',
                     'Environment :: Console',
                     'Intended Audience :: Science/Research',
                     'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
                     'Operating System :: OS Independent',
                     'Programming Language :: Python :: 2.7',
-                    'Programming Language :: Python :: 3.5',
-                    'Topic :: Scientific/Engineering'
+                    'Programming Language :: Python :: 3.6',
+                    'Programming Language :: Python :: 3.7',
+                    'Programming Language :: Python :: 3.8',
+                    'Programming Language :: Python :: 3.9',
+                    'Topic :: Scientific/Engineering',
                     ],
        license='LGPLv3',
        package_dir = { 'pymavlink' : '.' },
@@ -136,7 +139,7 @@ setup (name = 'pymavlink',
                                                      'C/include_v2.0/*.h',
                                                      'C/include_v2.0/*.hpp',
                                                      'CPP11/include_v2.0/*.hpp',
-                                                     'CS/common/*.cs',
+                                                     'CS/*.*',
                                                      'swift/*.swift',],
                         'pymavlink'              : ['mavnative/*.h',
                                                     'message_definitions/v*/*.xml']
